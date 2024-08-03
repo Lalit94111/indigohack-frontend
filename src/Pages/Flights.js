@@ -8,14 +8,14 @@ import socket from "../socket";
 
 const Flights = () => {
   const { flights, setFlights, updateFlightData } = useFlights();
-  // const [flights, setFlights] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [isAdmin, setIsAdmin] = useState(false);
+  const [searchPrefix, setSearchPrefix] = useState(""); // State for search input
 
   useEffect(() => {
     const role = localStorage.getItem("role");
-    setIsAdmin(role==='true');
+    setIsAdmin(role === 'true');
   }, []);
 
   useEffect(() => {
@@ -23,7 +23,11 @@ const Flights = () => {
       try {
         const token = localStorage.getItem("token");
         const BaseURL = process.env.REACT_APP_BACKEND;
-        const response = await axios.get(`${BaseURL}/flight/`, {
+        const url = searchPrefix
+          ? `${BaseURL}/flight/search/flight?prefix=${searchPrefix}`
+          : `${BaseURL}/flight/`;
+
+        const response = await axios.get(url, {
           headers: {
             Authorization: `Bearer ${token}`,
           },
@@ -38,24 +42,71 @@ const Flights = () => {
     };
 
     fetchFlights();
-  }, [setFlights]);
+  }, [searchPrefix, setFlights]);
 
   useEffect(() => {
     socket.on("fetch_updated_flight", (updatedFlight) => {
       console.log("Flight updated:", updatedFlight.flight_id);
-      updateFlightData(updatedFlight.flight_id); 
+      updateFlightData(updatedFlight.flight_id);
     });
 
-    
     return () => {
-      socket.off("fetch_updated_flight"); 
+      socket.off("fetch_updated_flight");
     };
   }, [updateFlightData]);
 
+  // Handler for search input change
+  const handleSearchChange = (event) => {
+    setSearchPrefix(event.target.value);
+  };
+
+  // Handler for search button click
+  const handleSearchSubmit = () => {
+    setLoading(true);
+    const fetchFlights = async () => {
+      try {
+        const token = localStorage.getItem("token");
+        const BaseURL = process.env.REACT_APP_BACKEND;
+        const url = searchPrefix
+          ? `${BaseURL}/flight/search/flight?prefix=${searchPrefix}`
+          : `${BaseURL}/flight/`;
+
+        const response = await axios.get(url, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+
+        setFlights(response.data);
+      } catch (err) {
+        setError("Failed to fetch flights.");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchFlights();
+  };
+
   return (
     <>
-      <Header isAdmin = {isAdmin} />
+      <Header isAdmin={isAdmin} />
       <div className="mt-16 mx-4 sm:mx-8">
+        <div className="mb-4 flex items-center">
+          <input
+            type="text"
+            placeholder="Search by flight prefix"
+            value={searchPrefix}
+            onChange={handleSearchChange}
+            className="px-4 py-2 border border-gray-300 rounded-md mr-4"
+          />
+          <button
+            onClick={handleSearchSubmit}
+            className="px-4 py-2 bg-blue-500 text-white rounded-md"
+          >
+            Search
+          </button>
+        </div>
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
@@ -87,7 +138,7 @@ const Flights = () => {
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
               {flights.map((flight, index) => (
-                <FlightRow key={index} flight={flight} isAdmin = {isAdmin}/>
+                <FlightRow key={index} flight={flight} isAdmin={isAdmin} />
               ))}
             </tbody>
           </table>
